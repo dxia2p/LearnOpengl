@@ -78,6 +78,14 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath) {
     glDeleteShader(fShader);
 }
 
+/*
+Shader::~Shader() {
+    std::cout << "Destroying shader with ID " << ID << std::endl;
+    glDeleteProgram(ID);
+}
+*/
+
+
 void Shader::use() {
     glUseProgram(ID);
 }
