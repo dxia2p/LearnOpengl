@@ -4,7 +4,9 @@ project(LearnOpenGL)
 
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(${CMAKE_PROJECT_NAME} main.cpp glad.c shader.cpp)
+set(SOURCES main.cpp glad.c shader.cpp camera.cpp)
+
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
 
 target_compile_definitions(LearnOpenGL PRIVATE ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 
