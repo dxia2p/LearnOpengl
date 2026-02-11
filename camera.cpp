@@ -9,7 +9,7 @@ Camera::Camera() {
 
 Camera::Camera(glm::vec3 pos) : position(pos) {}
 
-glm::mat4 Camera::generateLookat() {
+glm::mat4 Camera::generateLookat() const {
     return glm::lookAt(position, position + forward, up);
 }
 
@@ -47,3 +47,9 @@ void Camera::processMouse(float xPos, float yPos) {
     lastY = yPos;
 }
 
+
+void Camera::processScroll(float yOffset) {
+    fov -= yOffset;
+    if (fov < MIN_FOV) fov = MIN_FOV;
+    if (fov > MAX_FOV) fov = MAX_FOV;
+}

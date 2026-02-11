@@ -24,12 +24,14 @@ public:
     float sensitivity = 0.1f;
 
     const float MAX_PITCH = 89.0f, MIN_PITCH = -89.0f;
+    const float MAX_FOV = 60.0f, MIN_FOV = 1.0f;
 
     Camera();
     Camera(glm::vec3 pos);
-    glm::mat4 generateLookat();
+    glm::mat4 generateLookat() const;
     void processKeyboard(Camera_Movement moveDir, float deltaTime);
     void processMouse(float xOffset, float yOffset);
+    void processScroll(float yOffset);
 
 private:
     float lastX = 0.0f, lastY = 0.0f;
