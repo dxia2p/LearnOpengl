@@ -142,6 +142,8 @@ float vertices[] = {  // includes normals
     // Vertex attributes for cube
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     glBindVertexArray(lightVAO);
 
@@ -182,7 +184,10 @@ float vertices[] = {  // includes normals
         glm::mat4 view = camera.generateLookat();
         
         // Draw light source
-        glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+        glm::vec3 lightPos(0.0f, 1.0f, 0.0f);
+        float orbitRadius = 2.0f;
+        glm::vec3 offset = glm::vec3(sin(glfwGetTime()), 0.0f, cos(glfwGetTime())) * orbitRadius;
+        lightPos += offset;
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, lightPos);
         model = glm::scale(model, glm::vec3(0.2f));
@@ -203,6 +208,8 @@ float vertices[] = {  // includes normals
         lightingShader.setMat4("view", view);
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("model", model);
+        lightingShader.setVec3("lightPos", lightPos);
+        //lightingShader.setVec3("viewPos", camera.position);
 
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
