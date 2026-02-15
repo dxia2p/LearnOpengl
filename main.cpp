@@ -53,6 +53,31 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.processScroll(yoffset);
 }
 
+unsigned int loadTexture(std::string path) {
+    unsigned int texture;
+    glGenTextures(1, &texture);
+
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
+    if (data) {
+        GLenum format;
+        if (nrChannels == 1) format = GL_RED;
+        else if (nrChannels == 3) format = GL_RGB;
+        else if (nrChannels == 4) format = GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    } else {
+        throw std::runtime_error("Failed to load texture at " + path);
+    }
+    stbi_image_free(data);
+    return texture;
+}
+
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
@@ -163,7 +188,6 @@ float vertices[] = {
     // Shaders
     Shader lightingShader((std::string(ASSETS_DIR) + "3.3.shader.vert").c_str(), (std::string(ASSETS_DIR) + "lightingShader.frag").c_str());
     lightingShader.use();
-    lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
     lightingShader.setFloat("material.shininess", 32.0f);
     lightingShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
     lightingShader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
@@ -172,33 +196,22 @@ float vertices[] = {
     Shader lightCubeShader((std::string(ASSETS_DIR) + "3.3.shader.vert").c_str(), (std::string(ASSETS_DIR) + "lightSourceShader.frag").c_str());
 
     // Texture
-    unsigned int diffuseMap;
-    glGenTextures(1, &diffuseMap);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, diffuseMap);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load((std::string(ASSETS_DIR) + "container2.png").c_str(), &width, &height, &nrChannels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
-        throw std::runtime_error("Failed to load texture");
-    }
-    stbi_image_free(data);
+    unsigned int diffuseMap, specularMap;
+    diffuseMap = loadTexture((std::string(ASSETS_DIR) + "container2.png").c_str());
+    specularMap = loadTexture((std::string(ASSETS_DIR) + "container2_specular.png").c_str());
 
     lightingShader.use();
     lightingShader.setInt("material.diffuse", 0);
+    lightingShader.setInt("material.specular", 1);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, diffuseMap);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, specularMap);
 
     // transformation matrices
 
     glEnable(GL_DEPTH_TEST);
-    
 
     while(!glfwWindowShouldClose(window)) {
         deltaTime = glfwGetTime() - lastFrame;
@@ -248,7 +261,6 @@ float vertices[] = {
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("model", model);
         lightingShader.setVec3("light.position", lightPos);
-        
 
 
         glm::vec3 diffuseColor = lightColor * glm::vec3(0.5f);
