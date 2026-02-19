@@ -5,11 +5,17 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <stdexcept>
+#include <assimp/Importer.hpp>
+#include <assimp/version.h>
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+
 #include <string>
 #include "glm/ext/matrix_transform.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
+#include "model.hpp"
+#include "debug.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -54,36 +60,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.processScroll(yoffset);
 }
 
-unsigned int loadTexture(std::string path) {
-    unsigned int texture;
-    glGenTextures(1, &texture);
-
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
-    if (data) {
-        GLenum format;
-        if (nrChannels == 1) format = GL_RED;
-        else if (nrChannels == 3) format = GL_RGB;
-        else if (nrChannels == 4) format = GL_RGBA;
-
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    } else {
-        throw std::runtime_error("Failed to load texture at " + path);
-    }
-    stbi_image_free(data);
-    return texture;
-}
-
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 int main() {
-    // Instantiate GLFW window
+    // -------------------------------------------- Initialize GLFW window ---------------------------------------------------
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -110,7 +91,7 @@ int main() {
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // --------------------------------------------End of Initialization---------------------------------------------------
+    // -------------------------------------------- End of Initialization ---------------------------------------------------
 
 float vertices[] = {
     // positions          // normals           // texture coords
@@ -177,27 +158,16 @@ glm::vec3 pointLightPositions[] = {
 	glm::vec3( 0.0f,  0.0f, -3.0f)
 };  
 
-    unsigned int cubeVAO, lightVAO;
-    glGenVertexArrays(1, &cubeVAO);
+    unsigned int lightVAO;
     glGenVertexArrays(1, &lightVAO);
-    glBindVertexArray(cubeVAO);
 
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Vertex attributes for cube
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-
     glBindVertexArray(lightVAO);
 
-    // We only need to bind the VBO we used previously (don't need to create a new one)
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
     // Vertex Attributes for lamp
@@ -213,7 +183,7 @@ glm::vec3 pointLightPositions[] = {
     lightingShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
     lightingShader.setVec3("dirLight.specular", 1.0f, 1.0f, 1.0f);
     lightingShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-    for(int i = 0; i < sizeof(pointLightPositions) / sizeof(glm::vec3); i++) {
+    for(int i = 0; i < 4; i++) {
         std::string uniformName = "pointLights[" + std::to_string(i) + "]";
         lightingShader.setVec3(uniformName + ".position", pointLightPositions[i]);
         lightingShader.setFloat(uniformName + ".constant", 1.0f);
@@ -222,6 +192,7 @@ glm::vec3 pointLightPositions[] = {
         lightingShader.setVec3(uniformName + ".ambient", 0.05f, 0.05f, 0.05f);
         lightingShader.setVec3(uniformName + ".diffuse", 0.8f, 0.8f, 0.8f);
         lightingShader.setVec3(uniformName + ".specular", 1.0f, 1.0f, 1.0f);
+        glCheckError();
     }
     lightingShader.setFloat("spotLight.cutoff", cos(glm::radians(12.5)));
     lightingShader.setFloat("spotLight.outerCutoff", cos(glm::radians(17.5)));
@@ -231,24 +202,17 @@ glm::vec3 pointLightPositions[] = {
     lightingShader.setVec3("spotLight.ambient", 0.05f, 0.05f, 0.05f);
     lightingShader.setVec3("spotLight.diffuse", 0.8f, 0.8f, 0.8f);
     lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+    lightingShader.setFloat("material.shininess", 32.0f);
     
 
     Shader lightCubeShader((std::string(ASSETS_DIR) + "3.3.shader.vert").c_str(), (std::string(ASSETS_DIR) + "lightSourceShader.frag").c_str());
 
-    // Texture
-    unsigned int diffuseMap, specularMap, emissionMap;
-    diffuseMap = loadTexture((std::string(ASSETS_DIR) + "container2.png").c_str());
-    specularMap = loadTexture((std::string(ASSETS_DIR) + "container2_specular.png").c_str());
+    Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
+Assimp::LogStream* stderrStream = Assimp::LogStream::createDefaultStream(aiDefaultLogStream_STDERR);
+Assimp::DefaultLogger::get()->attachStream(stderrStream, Assimp::Logger::NORMAL | Assimp::Logger::DEBUGGING | Assimp::Logger::VERBOSE);
 
-    lightingShader.use();
-    lightingShader.setInt("material.diffuse", 0);
-    lightingShader.setInt("material.specular", 1);
-    lightingShader.setFloat("material.shininess", 32.0f);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, diffuseMap);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, specularMap);
+    char modelPath[] = ASSETS_DIR "backpack/backpack.obj";
+    Model model = Model(modelPath);
 
     // transformation matrices
 
@@ -283,6 +247,7 @@ glm::vec3 pointLightPositions[] = {
         // Draw cube
         lightingShader.use();
 
+        lightingShader.setMat4("model", glm::mat4(1.0f));
         lightingShader.setMat4("view", view);
         lightingShader.setMat4("projection", projection);
 
@@ -290,17 +255,8 @@ glm::vec3 pointLightPositions[] = {
         lightingShader.setVec3("spotLight.position", camera.position);
         lightingShader.setVec3("spotLight.direction", camera.forward);
 
-        glBindVertexArray(cubeVAO);
-        for(unsigned int i = 0; i < 10; i++)
-        {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            float angle = 20.0f * i;
-            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-            lightingShader.setMat4("model", model);
-
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        model.Draw(lightingShader);
+        glCheckError();
         
         glBindVertexArray(0);
 
@@ -309,9 +265,10 @@ glm::vec3 pointLightPositions[] = {
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &cubeVAO);
     glDeleteVertexArrays(1, &lightVAO);
     glDeleteBuffers(1, &VBO);
+
+    Assimp::DefaultLogger::kill();
 
     glfwTerminate();
     return 0;
